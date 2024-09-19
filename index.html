@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text to Speech Converter</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f4f4f4;
+        }
+
+        .container {
+            text-align: center;
+            width: 80%;
+            max-width: 800px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 150px;
+            margin-bottom: 20px;
+            font-size: 16px;
+            transition: font-size 0.3s, height 0.3s;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+
+        .controls, .preset-section {
+            margin: 10px 0;
+        }
+
+        .slider {
+            width: 100%;
+        }
+
+        .speed-display, .timer-display {
+            margin: 10px 0;
+        }
+
+        .preset-section {
+            margin-top: 20px;
+        }
+
+        .preset-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .preset-list {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .preset-item {
+            margin: 5px 0;
+        }
+
+        button {
+            margin: 5px;
+            padding: 10px 20px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #007bff;
+            color: white;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .delete-btn {
+            background-color: #dc3545;
+        }
+
+        .delete-btn:hover {
+            background-color: #c82333;
+        }
+
+        .text-size-btn {
+            margin-top: 10px;
+            padding: 10px 15px;
+            background-color: #28a745;
+            font-size: 20px;
+        }
+
+        .text-size-btn:hover {
+            background-color: #218838;
+        }
+
+        .highlight {
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Text to Speech Converter</h1>
+        <textarea id="textInput" placeholder="Enter your text here..."></textarea>
+        <div class="controls">
+            <label for="loopCheckbox">Loop:</label>
+            <input type="checkbox" id="loopCheckbox">
+        </div>
+        <div class="controls">
+            <label for="speedSlider">Speed:</label>
+            <input type="range" id="speedSlider" min="0.1" max="3" step="0.1" value="1" class="slider" oninput="updateSpeedDisplay()">
+        </div>
+        <div id="speedDisplay" class="speed-display">Speed: 1.0</div>
+        <div id="timerDisplay" class="timer-display">Estimated Time: 0 seconds</div>
+        <button onclick="startSpeech()">Speak</button>
+        <button onclick="stopSpeech()">Stop</button>
+        <button onclick="clearText()">Clear</button>
+        <button onclick="toggleTextSize()" class="text-size-btn">+</button>
+
+        <div class="preset-section">
+            <div class="preset-title">Presets:</div>
+            <div class="preset-list" id="presetList"></div>
+            <input type="text" id="newPresetName" placeholder="New preset name" maxlength="20">
+            <button onclick="addPreset()">Add Preset</button>
+        </div>
+    </div>
+
+    <script>
+        let synth = window.speechSynthesis;
+        let utterance;
+        let isLooping = false;
+        let isMaximized = false;
+        const maxPresets = 5;
+        const avgWordsPerMinute = 130; // Average words per minute
+
+        const globalPresets = [
+            {
+                name: "New Econ Quiz",
+                text: `Top box is factor market. Arrow going from top box to right box is income. 
+                From right box to top box is factors of production. Right box is households. 
+                From right box to bottom box is consumer spending. From bottom box to right box is goods and services. 
+                Bottom box is product market. From bottom box to left box is revenue. From left box to bottom box is goods and services. 
+                Left box is businesses. From left box to top box is costs. From top box to left box is factors of production.`
+            }
+        ];
+
+        document.addEventListener("DOMContentLoaded", function() {
+            loadPresets();
+        });
+
+        function startSpeech() {
+            const text = document.getElementById('textInput').value;
+            const speed = document.getElementById('speedSlider').value;
+            if (!text) return;
+
+            utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = speed;
+            utterance.onboundary = function(event) {
+                highlightCurrentWord(event.charIndex);
+            };
+            utterance.onend = function() {
+                if (isLooping) {
+                    synth.speak(utterance);
+                }
+            };
+
+            isLooping = document.getElementById('loopCheckbox').checked;
+            synth.speak(utterance);
+        }
+
+        function stopSpeech() {
+            synth.cancel();
+        }
+
+        function updateSpeedDisplay() {
+            const speed = document.getElementById('speedSlider').value;
+            document.getElementById('speedDisplay').innerText = `Speed: ${speed}`;
+            updateTimerDisplay();
+        }
+
+        function updateTimerDisplay() {
+            const text = document.getElementById('textInput').value;
+            const wordCount = text.split(/\s+/).length;
+            const speed = document.getElementById('speedSlider').value;
+            const minutes = wordCount / avgWordsPerMinute / speed;
+            const seconds = Math.round(minutes * 60);
+            document.getElementById('timerDisplay').innerText = `Estimated Time: ${seconds} seconds`;
+        }
+
+        function clearText() {
+            document.getElementById('textInput').value = '';
+            document.getElementById('timerDisplay').innerText = 'Estimated Time: 0 seconds';
+            document.getElementById('textInput').style.fontWeight = 'normal'; // Reset font weight
+        }
+
+        function toggleTextSize() {
+            const textarea = document.getElementById('textInput');
+            if (isMaximized) {
+                textarea.style.fontSize = '16px';
+                textarea.style.height = '150px';
+                document.querySelector('.text-size-btn').innerText = '+';
+            } else {
+                textarea.style.fontSize = '24px';
+                textarea.style.height = '250px';
+                document.querySelector('.text-size-btn').innerText = '-';
+            }
+            isMaximized = !isMaximized;
+        }
+
+        function highlightCurrentWord(index) {
+            const text = document.getElementById('textInput').value;
+            const words = text.split(/\s+/);
+            const currentWord = words[index];
+            const highlightedText = words.map((word, i) => i === index ? `<span class="highlight">${word}</span>` : word).join(' ');
+            document.getElementById('textInput').innerHTML = highlightedText;
+        }
+
+        function addPreset() {
+            const newPresetName = document.getElementById('newPresetName').value;
+            if (!newPresetName || newPresetName.length > 20) return;
+
+            const presets = JSON.parse(localStorage.getItem('presets')) || [];
+            if (presets.length >= maxPresets) return;
+
+            presets.push({ name: newPresetName, text: '' });
+            localStorage.setItem('presets', JSON.stringify(presets));
+            loadPresets();
+        }
+
+        function deletePreset(index) {
+            const presets = JSON.parse(localStorage.getItem('presets')) || [];
+            presets.splice(index, 1);
+            localStorage.setItem('presets', JSON.stringify(presets));
+            loadPresets();
+        }
+
+        function loadPresets() {
+            const presets = JSON.parse(localStorage.getItem('presets')) || [];
+            const allPresets = [...globalPresets, ...presets]; // Include global presets
+            const presetList = document.getElementById('presetList');
+            presetList.innerHTML = '';
+            
+            allPresets.forEach((preset, index) => {
+                const presetItem = document.createElement('div');
+                presetItem.className = 'preset-item';
+                // Prevent deletion of global presets
+                if (index < globalPresets.length) {
+                    presetItem.innerHTML = `
+                        ${preset.name} <button onclick="setPresetText(${index}, true)">Use</button>
+                    `;
+                } else {
+                    presetItem.innerHTML = `
+                        ${preset.name} <button onclick="setPresetText(${index - globalPresets.length})">Use</button>
+                        <button class="delete-btn" onclick="deletePreset(${index - globalPresets.length})">Delete</button>
+                    `;
+                }
+                presetList.appendChild(presetItem);
+            });
+        }
+
+        function setPresetText(index, isGlobal = false) {
+            const presets = isGlobal ? globalPresets : JSON.parse(localStorage.getItem('presets')) || [];
+            document.getElementById('textInput').value = presets[index].text;
+            updateTimerDisplay();
+        }
+    </script>
+</body>
+</html>
